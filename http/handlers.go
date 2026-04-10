@@ -173,6 +173,19 @@ func (h HTTPHandlers) HandleGetAllUncomplitedTAsks(w http.ResponseWriter, r *htt
 
 }
 
+func (h HTTPHandlers) HandleGetAllCompletedTasks(w http.ResponseWriter, r *http.Request) {
+	completedTasks := h.todoList.ListCompletedTasks()
+	b, err := json.MarshalIndent(completedTasks, "", "    ")
+	if err != nil {
+		log.Fatalln("Impossible error in MarshalIndent", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("failed to write HTTP response:", err)
+	}
+}
+
 /*
 	 pattern: /tasks/{title}
 	 method: PATCH
@@ -195,37 +208,37 @@ func (h HTTPHandlers) HandleCompleteTask(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	title := mux.Vars(r)["title"]
-	var task todo.Task
-	var err error
-
-	if completeDTO.Complete {
-		task, err = h.todoList.CompleteTask(title)
-		if err != nil {
-			errDTO := NewErrorDTO(err)
-			if errors.Is(err, todo.ErrTaskNotFound) {
-				http.Error(w, errDTO.ToString(), http.StatusNotFound)
-			} else {
-				http.Error(w, errDTO.ToString(), http.StatusInternalServerError)
-			}
-
-			return
-		}
-	} else {
-		task, err = h.todoList.UncompleteTask(title)
-		if err != nil {
-			errDTO := NewErrorDTO(err)
-			if errors.Is(err, todo.ErrTaskNotFound) {
-				http.Error(w, errDTO.ToString(), http.StatusNotFound)
-			} else {
-				http.Error(w, errDTO.ToString(), http.StatusInternalServerError)
-			}
-
-			return
-		}
+	shouldComplete, err := completeDTO.CompletionValue()
+	if err != nil {
+		errDTO := NewErrorDTO(err)
+		http.Error(w, errDTO.ToString(), http.StatusBadRequest)
+		return
 	}
 
-	b, err := json.MarshalIndent(task, "", "    ")
+	title := mux.Vars(r)["title"]
+	var (
+		changedTask todo.Task
+		updateErr   error
+	)
+
+	if shouldComplete {
+		changedTask, updateErr = h.todoList.CompleteTask(title)
+	} else {
+		changedTask, updateErr = h.todoList.UncompleteTask(title)
+	}
+
+	if updateErr != nil {
+		errDTO := NewErrorDTO(updateErr)
+
+		if errors.Is(updateErr, todo.ErrTaskNotFound) {
+			http.Error(w, errDTO.ToString(), http.StatusNotFound)
+		} else {
+			http.Error(w, errDTO.ToString(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	b, err := json.MarshalIndent(changedTask, "", "    ")
 	if err != nil {
 		log.Fatalln("Impossible error in MarshalIndent", err)
 	}

@@ -9,7 +9,24 @@ import (
 )
 
 type completeTaskDTO struct {
-	Complete bool
+	Complete  *bool `json:"complete"`
+	Completed *bool `json:"completed"`
+}
+
+func (d completeTaskDTO) CompletionValue() (bool, error) {
+	if d.Complete == nil && d.Completed == nil {
+		return false, errors.New("body must contain 'complete' or 'completed' field")
+	}
+
+	if d.Complete != nil && d.Completed != nil && *d.Complete != *d.Completed {
+		return false, errors.New("'complete' and 'completed' fields conflict")
+	}
+
+	if d.Completed != nil {
+		return *d.Completed, nil
+	}
+
+	return *d.Complete, nil
 }
 
 type TaskDTO struct {

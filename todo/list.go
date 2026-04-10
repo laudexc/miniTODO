@@ -65,6 +65,21 @@ func (l *List) ListUncompletedTasks() map[string]Task {
 	return uncompletedTasks
 }
 
+func (l *List) ListCompletedTasks() map[string]Task {
+	l.mtx.RLock()
+	defer l.mtx.RUnlock()
+
+	completedTasks := make(map[string]Task)
+
+	for title, task := range l.tasks {
+		if task.Completed {
+			completedTasks[title] = task
+		}
+	}
+
+	return completedTasks
+}
+
 func (l *List) CompleteTask(title string) (Task, error) {
 	l.mtx.Lock()
 	defer l.mtx.Unlock()
