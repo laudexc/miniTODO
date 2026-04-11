@@ -3,8 +3,8 @@
 import (
 	"log"
 
-	apihttp "restAPI/http"
-	"restAPI/todo"
+	apihttp "httpLibrary/http"
+	"httpLibrary/todo"
 )
 
 func main() {

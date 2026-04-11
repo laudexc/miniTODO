@@ -1,4 +1,4 @@
-module restAPI
+module httpLibrary
 
 go 1.25.7
 
