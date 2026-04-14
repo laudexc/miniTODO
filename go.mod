@@ -1,4 +1,4 @@
-module restAPI
+module miniTODO
 
 go 1.25.7
 

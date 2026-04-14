@@ -3,13 +3,13 @@
 import (
 	"log"
 
-	apihttp "restAPI/http"
-	"restAPI/todo"
+	apihttp "miniTODO/http"
+	mylib "miniTODO/myLib"
 )
 
 func main() {
-	todoList := todo.NewList()
-	handlers := apihttp.NewHTTPHandlers(todoList)
+	bookshelf := mylib.NewBookshelf()
+	handlers := apihttp.NewHTTPHandlers(bookshelf)
 	server := apihttp.NewHTTPServer(handlers)
 
 	if err := server.StartServer(); err != nil {

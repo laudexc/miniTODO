@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"restAPI/todo"
 
 	"github.com/gorilla/mux"
 )
