@@ -5,18 +5,19 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"miniTODO/myLib"
 	"net/http"
 
 	"github.com/gorilla/mux"
 )
 
 type HTTPHandlers struct {
-	todoList *todo.List
+	bookshelf *myLib.Bookshelf
 }
 
-func NewHTTPHandlers(todoList *todo.List) *HTTPHandlers {
+func NewHTTPHandlers(BookShlf *myLib.Bookshelf) *HTTPHandlers {
 	return &HTTPHandlers{
-		todoList: todoList,
+		bookshelf: BookShlf,
 	}
 }
 
@@ -33,27 +34,27 @@ failed:
   - status code: 400, 409, 500...
   - response body: JSON with error + time
 */
-func (h *HTTPHandlers) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
-	var taskDTO TaskDTO
-	if err := json.NewDecoder(r.Body).Decode(&taskDTO); err != nil {
+func (h *HTTPHandlers) HandleCreateBook(w http.ResponseWriter, r *http.Request) {
+	var bookDTO BookDTO
+	if err := json.NewDecoder(r.Body).Decode(&bookDTO); err != nil {
 		errDTO := NewErrorDTO(err)
 
 		http.Error(w, errDTO.ToString(), http.StatusBadRequest)
 		return
 	}
 
-	if err := taskDTO.ValidateForCreate(); err != nil {
+	if err := bookDTO.ValidateForCreate(); err != nil {
 		errDTO := NewErrorDTO(err)
 
 		http.Error(w, errDTO.ToString(), http.StatusBadRequest)
 		return
 	}
 
-	todoTask := todo.NewTask(taskDTO.Title, taskDTO.Description)
-	if err := h.todoList.AddTask(todoTask); err != nil {
+	book := myLib.NewBook(bookDTO.Title, bookDTO.Author, bookDTO.NumOfPages)
+	if err := h.bookshelf.AddBook(book); err != nil {
 		errDTO := NewErrorDTO(err)
 
-		if errors.Is(err, todo.ErrTaskAlreadyExists) {
+		if errors.Is(err, myLib.ErrBookAlreadyExists) {
 			http.Error(w, errDTO.ToString(), http.StatusConflict)
 		} else {
 			http.Error(w, errDTO.ToString(), http.StatusInternalServerError)
@@ -62,7 +63,7 @@ func (h *HTTPHandlers) HandleCreateTask(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	b, err := json.MarshalIndent(todoTask, "", "    ")
+	b, err := json.MarshalIndent(book, "", "    ")
 	if err != nil {
 		log.Fatalln("Impossible error in MarshalIndent", err)
 	}
@@ -71,51 +72,6 @@ func (h *HTTPHandlers) HandleCreateTask(w http.ResponseWriter, r *http.Request) 
 	if _, err := w.Write(b); err != nil {
 		fmt.Println("failed to write http response:", err)
 		return
-	}
-}
-
-/*
-	 pattern: /tasks/{title}
-	 method: GET
-	 info: pattern
-
-	 succeed:
-		- status code: 200 OK
-		- response body: JSON respresented found task
-
-	 failed:
-		- status code: 400, 404, 500...
-		- response body: JSON with error + time
-*/
-func (h HTTPHandlers) HandleGetTask(w http.ResponseWriter, r *http.Request) {
-	title := mux.Vars(r)["title"] // вернет мапу с ключем - параметром, значением - что там написал клиент;
-	// ок - написал ли что то или нет, можно не проверять, ибо если этот хендлер уже вызвался - значит что то было передано
-
-	task, err := h.todoList.GetTask(title)
-	if err != nil {
-		// errDTO := ErrorDTO {
-		// 	Message: err.Error(),
-		// 	Time: time.Now(),
-		// }
-		errDTO := NewErrorDTO(err)
-
-		if errors.Is(err, todo.ErrTaskNotFound) {
-			http.Error(w, errDTO.ToString(), http.StatusNotFound)
-		} else {
-			http.Error(w, errDTO.ToString(), http.StatusInternalServerError)
-		}
-
-		return
-	}
-
-	b, err := json.MarshalIndent(task, "", "    ")
-	if err != nil {
-		log.Fatalln("Impossible error in MarshalIndent", err)
-	}
-
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(b); err != nil {
-		fmt.Println("failed to write HTTP response:", err)
 	}
 }
 
@@ -132,9 +88,9 @@ func (h HTTPHandlers) HandleGetTask(w http.ResponseWriter, r *http.Request) {
 		- status code: 400, 500...
 		- response body: JSON with error + time
 */
-func (h HTTPHandlers) HandleGetAllTasks(w http.ResponseWriter, r *http.Request) {
-	tasks := h.todoList.ListTasks()
-	b, err := json.MarshalIndent(tasks, "", "    ")
+func (h HTTPHandlers) HandleGetAllBooks(w http.ResponseWriter, r *http.Request) {
+	books := h.bookshelf.ListBooks()
+	b, err := json.MarshalIndent(books, "", "    ")
 	if err != nil {
 		log.Fatalln("Impossible error in MarshalIndent", err)
 	}
@@ -146,7 +102,86 @@ func (h HTTPHandlers) HandleGetAllTasks(w http.ResponseWriter, r *http.Request) 
 }
 
 /*
-	 pattern: /tasks?completed=false
+	 pattern: /tasks?title=string
+	 method: GET
+	 info: query params
+
+	 succeed:
+		- status code: 200 OK
+		- response body: JSON respresented found task
+
+	 failed:
+		- status code: 400, 404, 500...
+		- response body: JSON with error + time
+*/
+func (h HTTPHandlers) HandleGetByTitle(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Query().Get("title")
+	if title == "" {
+		errDTO := NewErrorDTO(errors.New("query param 'title' is required"))
+		http.Error(w, errDTO.ToString(), http.StatusBadRequest)
+		return
+	}
+
+	book, err := h.bookshelf.GetBook(title)
+	if err != nil {
+		errDTO := NewErrorDTO(err)
+
+		if errors.Is(err, myLib.ErrBookNotFound) {
+			http.Error(w, errDTO.ToString(), http.StatusNotFound)
+		} else {
+			http.Error(w, errDTO.ToString(), http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	b, err := json.MarshalIndent(book, "", "    ")
+	if err != nil {
+		log.Fatalln("Impossible error in MarshalIndent", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("failed to write HTTP response:", err)
+	}
+}
+
+/*
+	 pattern: /tasks?author=string
+	 method: GET
+	 info: query params
+
+	 succeed:
+		- status code: 200 OK
+		- response body: JSON respresented found task
+
+	 failed:
+		- status code: 400, 404, 500...
+		- response body: JSON with error + time
+*/
+func (h HTTPHandlers) HandleGetByAuthor(w http.ResponseWriter, r *http.Request) {
+	author := r.URL.Query().Get("author")
+	if author == "" {
+		errDTO := NewErrorDTO(errors.New("query param 'author' is required"))
+		http.Error(w, errDTO.ToString(), http.StatusBadRequest)
+		return
+	}
+
+	books := h.bookshelf.ListByAuthorBook(author)
+
+	b, err := json.MarshalIndent(books, "", "    ")
+	if err != nil {
+		log.Fatalln("Impossible error in MarshalIndent", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("failed to write HTTP response:", err)
+	}
+}
+
+/*
+	 pattern: /books?completed=true
 	 method: GET
 	 info: query params
 
@@ -158,22 +193,8 @@ func (h HTTPHandlers) HandleGetAllTasks(w http.ResponseWriter, r *http.Request) 
 		- status code: 400, 500...
 		- response body: JSON with error + time
 */
-func (h HTTPHandlers) HandleGetAllUncomplitedTAsks(w http.ResponseWriter, r *http.Request) {
-	uncompletedTasks := h.todoList.ListUncompletedTasks()
-	b, err := json.MarshalIndent(uncompletedTasks, "", "    ")
-	if err != nil {
-		log.Fatalln("Impossible error in MarshalIndent", err)
-	}
-
-	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write(b); err != nil {
-		fmt.Println("failed to write HTTP response:", err)
-	}
-
-}
-
-func (h HTTPHandlers) HandleGetAllCompletedTasks(w http.ResponseWriter, r *http.Request) {
-	completedTasks := h.todoList.ListCompletedTasks()
+func (h HTTPHandlers) HandleGetAllReadedBooks(w http.ResponseWriter, r *http.Request) {
+	completedTasks := h.bookshelf.ListCompletedBooks()
 	b, err := json.MarshalIndent(completedTasks, "", "    ")
 	if err != nil {
 		log.Fatalln("Impossible error in MarshalIndent", err)
@@ -186,7 +207,34 @@ func (h HTTPHandlers) HandleGetAllCompletedTasks(w http.ResponseWriter, r *http.
 }
 
 /*
-	 pattern: /tasks/{title}
+	 pattern: /books?completed=false
+	 method: GET
+	 info: query params
+
+	 succeed:
+		- status code: 200 OK
+		- response body: JSON respresented found tasks
+
+	 failed:
+		- status code: 400, 500...
+		- response body: JSON with error + time
+*/
+func (h HTTPHandlers) HandleGetAllUnreadedBooks(w http.ResponseWriter, r *http.Request) {
+	uncompletedTasks := h.bookshelf.ListUncompletedBooks()
+	b, err := json.MarshalIndent(uncompletedTasks, "", "    ")
+	if err != nil {
+		log.Fatalln("Impossible error in MarshalIndent", err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("failed to write HTTP response:", err)
+	}
+
+}
+
+/*
+	 pattern: /books/{title}
 	 method: PATCH
 	 info: pattern + JSON in request body
 
@@ -198,8 +246,8 @@ func (h HTTPHandlers) HandleGetAllCompletedTasks(w http.ResponseWriter, r *http.
 		- status code: 400, 409, 500...
 		- response body: JSON with error + time
 */
-func (h HTTPHandlers) HandleCompleteTask(w http.ResponseWriter, r *http.Request) {
-	var completeDTO completeTaskDTO
+func (h HTTPHandlers) HandleReadBook(w http.ResponseWriter, r *http.Request) {
+	var completeDTO completedBookDTO
 	if err := json.NewDecoder(r.Body).Decode(&completeDTO); err != nil {
 		errDTO := NewErrorDTO(err)
 
@@ -216,20 +264,20 @@ func (h HTTPHandlers) HandleCompleteTask(w http.ResponseWriter, r *http.Request)
 
 	title := mux.Vars(r)["title"]
 	var (
-		changedTask todo.Task
+		changedBook myLib.Book
 		updateErr   error
 	)
 
 	if shouldComplete {
-		changedTask, updateErr = h.todoList.CompleteTask(title)
+		changedBook, updateErr = h.bookshelf.ReadBook(title)
 	} else {
-		changedTask, updateErr = h.todoList.UncompleteTask(title)
+		changedBook, updateErr = h.bookshelf.UnreadBook(title)
 	}
 
 	if updateErr != nil {
 		errDTO := NewErrorDTO(updateErr)
 
-		if errors.Is(updateErr, todo.ErrTaskNotFound) {
+		if errors.Is(updateErr, myLib.ErrBookNotFound) {
 			http.Error(w, errDTO.ToString(), http.StatusNotFound)
 		} else {
 			http.Error(w, errDTO.ToString(), http.StatusInternalServerError)
@@ -237,7 +285,7 @@ func (h HTTPHandlers) HandleCompleteTask(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	b, err := json.MarshalIndent(changedTask, "", "    ")
+	b, err := json.MarshalIndent(changedBook, "", "    ")
 	if err != nil {
 		log.Fatalln("Impossible error in MarshalIndent", err)
 	}
@@ -249,7 +297,7 @@ func (h HTTPHandlers) HandleCompleteTask(w http.ResponseWriter, r *http.Request)
 }
 
 /*
-	 pattern: /tasks/{title}
+	 pattern: /books/{title}
 	 method: DELETE
 	 info: pattern
 
@@ -261,12 +309,12 @@ func (h HTTPHandlers) HandleCompleteTask(w http.ResponseWriter, r *http.Request)
 		- status code: 400, 404, 500...
 		- response body: JSON with error + time
 */
-func (h HTTPHandlers) HandleDeleteTask(w http.ResponseWriter, r *http.Request) {
+func (h HTTPHandlers) HandleDeleteBook(w http.ResponseWriter, r *http.Request) {
 	title := mux.Vars(r)["title"]
 
-	if err := h.todoList.DeleteTask(title); err != nil {
+	if err := h.bookshelf.DeleteBook(title); err != nil {
 		errDTO := NewErrorDTO(err)
-		if errors.Is(err, todo.ErrTaskNotFound) {
+		if errors.Is(err, myLib.ErrBookNotFound) {
 			http.Error(w, errDTO.ToString(), http.StatusNotFound)
 		} else {
 			http.Error(w, errDTO.ToString(), http.StatusInternalServerError)

@@ -8,39 +8,44 @@ import (
 	"time"
 )
 
-type completeTaskDTO struct {
+type completedBookDTO struct {
 	Complete  *bool `json:"complete"`
 	Completed *bool `json:"completed"`
 }
 
-func (d completeTaskDTO) CompletionValue() (bool, error) {
-	if d.Complete == nil && d.Completed == nil {
+func (cb completedBookDTO) CompletionValue() (bool, error) {
+	if cb.Complete == nil && cb.Completed == nil {
 		return false, errors.New("body must contain 'complete' or 'completed' field")
 	}
 
-	if d.Complete != nil && d.Completed != nil && *d.Complete != *d.Completed {
+	if cb.Complete != nil && cb.Completed != nil && *cb.Complete != *cb.Completed {
 		return false, errors.New("'complete' and 'completed' fields conflict")
 	}
 
-	if d.Completed != nil {
-		return *d.Completed, nil
+	if cb.Completed != nil {
+		return *cb.Completed, nil
 	}
 
-	return *d.Complete, nil
+	return *cb.Complete, nil
 }
 
-type TaskDTO struct {
-	Title       string
-	Description string
+type BookDTO struct {
+	Title      string
+	Author     string
+	NumOfPages int
 }
 
-func (t TaskDTO) ValidateForCreate() error { // Валидация только для создания
-	if strings.TrimSpace(t.Title) == "" {
+func (b BookDTO) ValidateForCreate() error { // Валидация только для создания
+	if strings.TrimSpace(b.Title) == "" {
 		return errors.New("title is empty")
 	}
 
-	if strings.TrimSpace(t.Description) == "" {
-		return errors.New("description is empty")
+	if strings.TrimSpace(b.Author) == "" {
+		return errors.New("author is empty")
+	}
+
+	if b.NumOfPages <= 0 {
+		return errors.New("the number of pages cannot be less than or equal to zero")
 	}
 
 	return nil

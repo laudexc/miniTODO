@@ -26,6 +26,20 @@ func (b *Bookshelf) AddBook(book Book) error {
 	return nil
 }
 
+// Получение списка всех книг
+func (b *Bookshelf) ListBooks() map[string]Book {
+	b.mtx.RLock()
+	defer b.mtx.RUnlock()
+
+	tmp := make(map[string]Book, len(b.books))
+
+	for k, v := range b.books {
+		tmp[k] = v
+	}
+
+	return tmp
+}
+
 // Получение информации о конкретной книге
 func (b *Bookshelf) GetBook(title string) (Book, error) {
 	b.mtx.RLock()
@@ -37,20 +51,6 @@ func (b *Bookshelf) GetBook(title string) (Book, error) {
 	}
 
 	return task, nil
-}
-
-// Получение списка всех книг
-func (b *Bookshelf) ListTasks() map[string]Book {
-	b.mtx.RLock()
-	defer b.mtx.RUnlock()
-
-	tmp := make(map[string]Book, len(b.books))
-
-	for k, v := range b.books {
-		tmp[k] = v
-	}
-
-	return tmp
 }
 
 // Получение списка всех книг, с учетом возможной фильтрации по автору
@@ -68,7 +68,7 @@ func (b *Bookshelf) ListByAuthorBook(author string) map[string]Book {
 	return byAuthorBooks
 }
 
-// Получение списка всех книг, с учетом возможной фильтрации по прочитано
+// Получение списка всех книг, с учетом возможной фильтрации по прочитано?
 func (b *Bookshelf) ListUncompletedBooks() map[string]Book {
 	b.mtx.RLock()
 	defer b.mtx.RUnlock()
@@ -83,7 +83,7 @@ func (b *Bookshelf) ListUncompletedBooks() map[string]Book {
 	return uncompletedBooks
 }
 
-// Получение списка всех книг, с учетом возможной фильтрации по не прочитано
+// Получение списка всех книг, с учетом возможной фильтрации по не прочитано?
 func (b *Bookshelf) ListCompletedBooks() map[string]Book {
 	b.mtx.RLock()
 	defer b.mtx.RUnlock()
@@ -131,7 +131,7 @@ func (b *Bookshelf) UnreadBook(title string) (Book, error) {
 	return book, nil
 }
 
-// Удаление книг из библиотеки
+// Удаление книги из библиотеки
 func (b *Bookshelf) DeleteBook(title string) error {
 	b.mtx.Lock()
 	defer b.mtx.Unlock()
